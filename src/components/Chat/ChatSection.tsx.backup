@@ -1,0 +1,126 @@
+import React, { useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { sendMessageAPI } from '@/services/chatService';
+import { addMessage, setLoading } from '@/store/features/chatSlice';
+import { RootState, AppDispatch } from '@/store/store';
+import { Message } from '@/types/user';
+
+const ChatSection: React.FC = () => {
+  const [inputValue, setInputValue] = useState('');
+  const { messages, isLoading } = useSelector((state: RootState) => state.chat);
+  const { user } = useSelector((state: RootState) => state.user);
+  const dispatch = useDispatch<AppDispatch>();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!inputValue.trim()) return;
+    
+    // 创建用户消息对象
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: inputValue,
+      sender: 'user',
+      timestamp: new Date(),
+      status: 'sending'
+    };
+    
+    // 立即添加用户消息到UI
+    dispatch(addMessage(userMessage));
+    
+    // 清空输入框
+    const contentToSend = inputValue;
+    setInputValue('');
+    
+    try {
+      // 实际发送消息到后端
+      await dispatch(sendMessageAPI({ content: contentToSend }));
+    } catch (error) {
+      console.error('发送消息失败:', error);
+      // 恢复用户消息的状态为失败
+      const updatedMessages = [...messages];
+      const lastMessage = updatedMessages[updatedMessages.length - 1];
+      if (lastMessage && lastMessage.content === contentToSend) {
+        // 在实际应用中，这里可以dispatch一个action来更新消息状态
+        // 但现在先保留原逻辑
+      }
+    }
+  };
+
+  return (
+    <div className="w-full">
+      {/* 聊天输入框 */}
+      <form onSubmit={handleSubmit} className="relative">
+        <div className="flex items-center border border-gray-300 rounded-full px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="输入任何问题"
+            className="flex-grow bg-transparent outline-none pr-4"
+            disabled={isLoading}
+          />
+          <button
+            type="submit"
+            disabled={isLoading || !inputValue.trim()}
+            className={`p-2 rounded-full ${
+              inputValue.trim()
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            } transition-colors`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      </form>
+
+      {/* 快捷操作按钮 */}
+      <div className="flex justify-center mt-4 space-x-4">
+        <button className="flex items-center text-gray-700 hover:text-blue-600 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+          <span>智能体</span>
+        </button>
+        
+        <button className="flex items-center bg-blue-100 text-blue-700 px-4 py-2 rounded-full hover:bg-blue-200 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+            <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+          </svg>
+          <span>深度思考</span>
+        </button>
+      </div>
+
+      {/* 消息历史展示（简化版） */}
+      {messages.length > 0 && (
+        <div className="mt-6 max-h-60 overflow-y-auto">
+          {messages.slice(-5).map((message) => (
+            <div 
+              key={message.id} 
+              className={`p-3 my-2 rounded-lg max-w-xs ${
+                message.sender === 'user' 
+                  ? 'bg-blue-100 text-gray-800 ml-auto' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}
+            >
+              <p>{message.content}</p>
+              <small className="text-gray-500 text-xs">
+                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </small>
+            </div>
+          ))}
+          {isLoading && (
+            <div className="p-3 my-2 bg-gray-100 text-gray-800 rounded-lg max-w-xs">
+              <p>AI正在思考中...</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ChatSection;
