@@ -1,8 +1,9 @@
 // 用户类型定义
 export interface User {
-  id: string;
+  id: string | number;
   username?: string;
-  email: string;
+  email?: string;
+  nickname?: string;
   avatar?: string;
   createdAt?: Date;
   updatedAt?: Date;

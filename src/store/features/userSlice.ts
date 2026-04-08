@@ -2,9 +2,10 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 // 定义用户类型
 interface User {
-  id?: string;
+  id?: string | number;
   username?: string;
   email?: string;
+  nickname?: string;
   avatar?: string;
   isLoggedIn: boolean;
 }
@@ -33,25 +34,25 @@ const userSlice = createSlice({
       state.loading = false;
       state.error = null;
     },
-    
+
     // 设置加载状态
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
     },
-    
+
     // 设置错误
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
       state.loading = false;
     },
-    
+
     // 登出
-    logout: (state) => {
+    logout: state => {
       state.user = null;
       state.loading = false;
       state.error = null;
-    }
-  }
+    },
+  },
 });
 
 export const { setUser, setLoading, setError, logout } = userSlice.actions;

@@ -16,22 +16,22 @@ const apiClient = axios.create({
 
 // 请求拦截器 - 添加认证token
 apiClient.interceptors.request.use(
-  (config) => {
+  config => {
     const token = localStorage.getItem('access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
+  error => {
     return Promise.reject(error);
   }
 );
 
 // 响应拦截器 - 处理错误
 apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  response => response,
+  error => {
     if (error.response?.status === 401) {
       // Token过期，清除本地存储并重定向到登录页
       localStorage.removeItem('access_token');
@@ -42,30 +42,35 @@ apiClient.interceptors.response.use(
 );
 
 // 用户登录
-export const loginAPI = async (email: string, password: string): Promise<{ user: User; token: string }> => {
+export const loginAPI = async (
+  username: string,
+  password: string
+): Promise<{ user: User; token: string }> => {
   try {
     // 后端实际登录路径：POST /api/login（在本项目中 baseURL 通常已包含 /api）
-    // 同时兼容后端用 username 登录的情况：将输入值同时填充到 username/email 字段
     const response = await apiClient.post('/login', {
-      username: email,
-      email,
+      username,
       password,
     });
-    
+
     // 兼容：后端统一响应 {code,message,data} 或直接返回业务对象
     const raw = response.data;
     // 兼容：data 里可能再包一层 { success, token, user, message }
     const unwrapped = unwrapBackendResponse<any>(raw);
-    const data = (unwrapped && typeof unwrapped === 'object' && 'data' in unwrapped ? (unwrapped as any).data : unwrapped) as {
+    const data = (
+      unwrapped && typeof unwrapped === 'object' && 'data' in unwrapped
+        ? (unwrapped as any).data
+        : unwrapped
+    ) as {
       user: User;
       token: string;
     };
-    
+
     // 存储token到localStorage
     if (data.token) {
       localStorage.setItem('access_token', data.token);
     }
-    
+
     return {
       user: data.user,
       token: data.token,
@@ -80,26 +85,34 @@ export const loginAPI = async (email: string, password: string): Promise<{ user:
 };
 
 // 用户注册
-export const registerAPI = async (username: string, email: string, password: string): Promise<{ user: User; token: string }> => {
+export const registerAPI = async (
+  username: string,
+  email: string,
+  password: string
+): Promise<{ user: User; token: string }> => {
   try {
     const response = await apiClient.post('/register', {
       username,
       email,
       password,
     });
-    
+
     const raw = response.data;
     const unwrapped = unwrapBackendResponse<any>(raw);
-    const data = (unwrapped && typeof unwrapped === 'object' && 'data' in unwrapped ? (unwrapped as any).data : unwrapped) as {
+    const data = (
+      unwrapped && typeof unwrapped === 'object' && 'data' in unwrapped
+        ? (unwrapped as any).data
+        : unwrapped
+    ) as {
       user: User;
       token: string;
     };
-    
+
     // 存储token到localStorage
     if (data.token) {
       localStorage.setItem('access_token', data.token);
     }
-    
+
     return {
       user: data.user,
       token: data.token,
@@ -133,7 +146,11 @@ export const getCurrentUserAPI = async (): Promise<User> => {
 // 用户登出
 export const logoutAPI = async (): Promise<void> => {
   try {
-    await apiClient.post('/logout');
+    const token = localStorage.getItem('access_token');
+    // 文档约定：登出需要传 token
+    await apiClient.post('/logout', {
+      token,
+    });
     // 清除本地存储的token
     localStorage.removeItem('access_token');
   } catch (error: any) {

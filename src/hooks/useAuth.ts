@@ -5,6 +5,9 @@ import { RootState } from '@/store/store';
 import { setUser, logout, setLoading, setError } from '@/store/features/userSlice';
 import { getCurrentUserAPI, loginAPI, registerAPI, logoutAPI } from '@/services/authService';
 
+let authCheckPromise: Promise<void> | null = null;
+let authCheckDone = false;
+
 /**
  * 认证相关的自定义Hook
  */
@@ -16,35 +19,53 @@ export const useAuth = () => {
 
   // 检查用户认证状态
   useEffect(() => {
-    const checkAuthStatus = async () => {
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        try {
-          dispatch(setLoading(true));
-          const userData = await getCurrentUserAPI();
-          dispatch(setUser({ ...userData, isLoggedIn: true }));
-        } catch (err) {
-          // Token无效，清除本地存储
-          localStorage.removeItem('access_token');
-          dispatch(logout());
-        } finally {
-          setIsCheckingAuth(false);
-          dispatch(setLoading(false));
-        }
-      } else {
-        setIsCheckingAuth(false);
-        dispatch(setLoading(false));
+    let cancelled = false;
+
+    const run = async () => {
+      if (authCheckDone) {
+        if (!cancelled) setIsCheckingAuth(false);
+        return;
+      }
+
+      if (!authCheckPromise) {
+        authCheckPromise = (async () => {
+          const token = localStorage.getItem('access_token');
+          if (!token) return;
+
+          try {
+            dispatch(setLoading(true));
+            const userData = await getCurrentUserAPI();
+            dispatch(setUser({ ...userData, isLoggedIn: true }));
+          } catch (err) {
+            localStorage.removeItem('access_token');
+            dispatch(logout());
+          } finally {
+            dispatch(setLoading(false));
+          }
+        })().finally(() => {
+          authCheckDone = true;
+        });
+      }
+
+      try {
+        await authCheckPromise;
+      } finally {
+        if (!cancelled) setIsCheckingAuth(false);
       }
     };
 
-    checkAuthStatus();
+    run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [dispatch]);
 
   // 登录
-  const login = async (email: string, password: string) => {
+  const login = async (username: string, password: string) => {
     try {
       dispatch(setLoading(true));
-      const result = await loginAPI(email, password);
+      const result = await loginAPI(username, password);
       dispatch(setUser({ ...result.user, isLoggedIn: true }));
       dispatch(setError(null));
       navigate('/');
