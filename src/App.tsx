@@ -10,7 +10,6 @@ import HomePage from '@/pages/HomePage';
 import LoginPage from '@/pages/auth/LoginPage';
 import RegisterPage from '@/pages/auth/RegisterPage';
 
-import '@/styles/index.css';
 import 'react-toastify/dist/ReactToastify.css';
 
 // 认证保护的路由组件
