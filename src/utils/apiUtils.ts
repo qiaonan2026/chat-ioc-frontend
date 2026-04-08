@@ -74,3 +74,28 @@ export const extractDataFromResponse = <T>(response: any): T | null => {
   }
   return null;
 };
+
+/**
+ * 兼容后端常见统一响应结构并提取 data
+ *
+ * 支持两类结构：
+ * 1) { code: number; message?: string; data: T }
+ * 2) 旧式：直接返回 T（或 { token, user } 这类业务对象）
+ */
+export const unwrapBackendResponse = <T>(payload: any): T => {
+  if (payload && typeof payload === 'object' && 'code' in payload) {
+    const code = (payload as any).code;
+    const message = (payload as any).message;
+    const data = (payload as any).data;
+
+    // 约定：常见成功码可能是 0 或 200
+    if (code === 0 || code === 200) {
+      return data as T;
+    }
+
+    throw new Error(message || `请求失败 (code=${code})`);
+  }
+
+  // 非统一包装结构，直接按业务数据返回
+  return payload as T;
+};

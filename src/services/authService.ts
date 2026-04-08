@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { User } from '@/types/user';
+import { unwrapBackendResponse } from '@/utils/apiUtils';
 
 // API基础配置
 const API_BASE_URL = (import.meta.env as any)?.VITE_API_URL || '/api';
@@ -43,12 +44,22 @@ apiClient.interceptors.response.use(
 // 用户登录
 export const loginAPI = async (email: string, password: string): Promise<{ user: User; token: string }> => {
   try {
-    const response = await apiClient.post('/auth/login', {
+    // 后端实际登录路径：POST /api/login（在本项目中 baseURL 通常已包含 /api）
+    // 同时兼容后端用 username 登录的情况：将输入值同时填充到 username/email 字段
+    const response = await apiClient.post('/login', {
+      username: email,
       email,
       password,
     });
     
-    const { data } = response;
+    // 兼容：后端统一响应 {code,message,data} 或直接返回业务对象
+    const raw = response.data;
+    // 兼容：data 里可能再包一层 { success, token, user, message }
+    const unwrapped = unwrapBackendResponse<any>(raw);
+    const data = (unwrapped && typeof unwrapped === 'object' && 'data' in unwrapped ? (unwrapped as any).data : unwrapped) as {
+      user: User;
+      token: string;
+    };
     
     // 存储token到localStorage
     if (data.token) {
@@ -71,13 +82,18 @@ export const loginAPI = async (email: string, password: string): Promise<{ user:
 // 用户注册
 export const registerAPI = async (username: string, email: string, password: string): Promise<{ user: User; token: string }> => {
   try {
-    const response = await apiClient.post('/auth/register', {
+    const response = await apiClient.post('/register', {
       username,
       email,
       password,
     });
     
-    const { data } = response;
+    const raw = response.data;
+    const unwrapped = unwrapBackendResponse<any>(raw);
+    const data = (unwrapped && typeof unwrapped === 'object' && 'data' in unwrapped ? (unwrapped as any).data : unwrapped) as {
+      user: User;
+      token: string;
+    };
     
     // 存储token到localStorage
     if (data.token) {
@@ -100,8 +116,11 @@ export const registerAPI = async (username: string, email: string, password: str
 // 获取当前用户信息
 export const getCurrentUserAPI = async (): Promise<User> => {
   try {
-    const response = await apiClient.get('/auth/me');
-    return response.data.user;
+    const response = await apiClient.get('/me');
+    const raw = response.data;
+    const data = unwrapBackendResponse<{ user: User } | User>(raw);
+    // 兼容两种返回：{user:{...}} 或直接 User
+    return (data as any).user ? (data as any).user : (data as User);
   } catch (error: any) {
     if (error.response && error.response.data) {
       throw new Error(error.response.data.message || '获取用户信息失败');
@@ -114,7 +133,7 @@ export const getCurrentUserAPI = async (): Promise<User> => {
 // 用户登出
 export const logoutAPI = async (): Promise<void> => {
   try {
-    await apiClient.post('/auth/logout');
+    await apiClient.post('/logout');
     // 清除本地存储的token
     localStorage.removeItem('access_token');
   } catch (error: any) {

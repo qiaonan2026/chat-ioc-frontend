@@ -1,5 +1,6 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
+import { unwrapBackendResponse } from '@/utils/apiUtils';
 
 // 定义消息类型
 export interface Message {
@@ -59,7 +60,8 @@ export const sendMessageAPI = createAsyncThunk(
         sessionId: sessionId || null,
       });
       
-      const { data } = response;
+      const raw = response.data;
+      const data = unwrapBackendResponse<any>(raw);
       return {
         id: data.id || Date.now().toString(),
         content: data.content || content,
@@ -82,7 +84,9 @@ export const getHistoryAPI = createAsyncThunk(
   async (sessionId: string, { rejectWithValue }) => {
     try {
       const response = await apiClient.get(`/chat/history/${sessionId}`);
-      return response.data.messages.map((msg: any) => ({
+      const raw = response.data;
+      const data = unwrapBackendResponse<any>(raw);
+      return (data.messages || []).map((msg: any) => ({
         id: msg.id,
         content: msg.content,
         sender: msg.sender,
@@ -102,7 +106,7 @@ export const getHistoryAPI = createAsyncThunk(
 export const getModelsAPI = async () => {
   try {
     const response = await apiClient.get('/models');
-    return response.data;
+    return unwrapBackendResponse<any>(response.data);
   } catch (error) {
     console.error('获取模型列表失败:', error);
     throw error;
@@ -113,7 +117,7 @@ export const getModelsAPI = async () => {
 export const createSessionAPI = async () => {
   try {
     const response = await apiClient.post('/chat/session');
-    return response.data;
+    return unwrapBackendResponse<any>(response.data);
   } catch (error) {
     console.error('创建会话失败:', error);
     throw error;
