@@ -34,36 +34,51 @@ const chatSlice = createSlice({
     addMessage: (state, action: PayloadAction<Message>) => {
       state.messages.push(action.payload);
     },
-    
+
     // 设置加载状态
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
     },
-    
+
     // 设置错误
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
     },
-    
+
     // 设置会话ID
     setSessionId: (state, action: PayloadAction<string>) => {
       state.sessionId = action.payload;
     },
-    
+
     // 清除聊天历史
-    clearMessages: (state) => {
+    clearMessages: state => {
       state.messages = [];
     },
-    
+
     // 设置消息历史
     setMessages: (state, action: PayloadAction<Message[]>) => {
       state.messages = action.payload;
-    }
+    },
+
+    // 更新指定消息（用于流式增量更新）
+    updateMessage: (
+      state,
+      action: PayloadAction<{
+        id: string;
+        patch: Partial<Pick<Message, 'content' | 'status'>>;
+      }>
+    ) => {
+      const { id, patch } = action.payload;
+      const msg = state.messages.find(m => m.id === id);
+      if (!msg) return;
+      if (patch.content !== undefined) msg.content = patch.content;
+      if (patch.status !== undefined) msg.status = patch.status;
+    },
   },
-  extraReducers: (builder) => {
+  extraReducers: builder => {
     builder
       // 发送消息
-      .addCase(sendMessageAPI.pending, (state) => {
+      .addCase(sendMessageAPI.pending, state => {
         state.isLoading = true;
         state.error = null;
       })
@@ -75,8 +90,14 @@ const chatSlice = createSlice({
           // 更新用户消息状态
           state.messages[lastMessageIndex].status = 'sent';
         }
+        // 同步会话ID（后端可能会返回最新 sessionId）
+        if (payload?.sessionId) {
+          state.sessionId = payload.sessionId;
+        }
         // 添加AI回复
-        state.messages.push(payload);
+        if (payload?.aiMessage) {
+          state.messages.push(payload.aiMessage);
+        }
       })
       .addCase(sendMessageAPI.rejected, (state, { error }) => {
         state.isLoading = false;
@@ -87,13 +108,21 @@ const chatSlice = createSlice({
           state.messages[lastMessageIndex].status = 'failed';
         }
       })
-      
+
       // 获取历史消息
       .addCase(getHistoryAPI.fulfilled, (state, { payload }) => {
         state.messages = payload;
       });
-  }
+  },
 });
 
-export const { addMessage, setLoading, setError, setSessionId, clearMessages, setMessages } = chatSlice.actions;
+export const {
+  addMessage,
+  setLoading,
+  setError,
+  setSessionId,
+  clearMessages,
+  setMessages,
+  updateMessage,
+} = chatSlice.actions;
 export default chatSlice.reducer;

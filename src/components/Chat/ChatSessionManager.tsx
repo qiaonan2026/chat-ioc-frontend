@@ -14,7 +14,9 @@ const ChatSessionManager: React.FC = () => {
     try {
       const newSession = await createSessionAPI();
       dispatch(clearMessages());
-      dispatch(setSessionId(newSession.id));
+      if (newSession?.sessionId) {
+        dispatch(setSessionId(newSession.sessionId));
+      }
     } catch (error) {
       console.error('创建会话失败:', error);
     } finally {
@@ -31,9 +33,7 @@ const ChatSessionManager: React.FC = () => {
         onClick={handleNewSession}
         disabled={isCreating}
         className={`text-sm px-3 py-1 rounded-md ${
-          isCreating 
-            ? 'bg-gray-300 text-gray-500' 
-            : 'bg-blue-500 text-white hover:bg-blue-600'
+          isCreating ? 'bg-gray-300 text-gray-500' : 'bg-blue-500 text-white hover:bg-blue-600'
         }`}
       >
         {isCreating ? '创建中...' : '新建会话'}

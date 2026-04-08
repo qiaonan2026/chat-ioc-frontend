@@ -12,10 +12,21 @@ import RegisterPage from '@/pages/auth/RegisterPage';
 
 import 'react-toastify/dist/ReactToastify.css';
 
+const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+  return (
+    <div className="App">
+      {isAuthenticated ? <Header /> : null}
+      {children}
+      <ToastContainer position="top-center" />
+    </div>
+  );
+};
+
 // 认证保护的路由组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isCheckingAuth } = useAuth();
-  
+
   if (isCheckingAuth) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -23,14 +34,14 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
       </div>
     );
   }
-  
+
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
 };
 
 // 公开路由组件（仅在未认证时可访问）
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isCheckingAuth } = useAuth();
-  
+
   if (isCheckingAuth) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -38,7 +49,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </div>
     );
   }
-  
+
   return !isAuthenticated ? <>{children}</> : <Navigate to="/" />;
 };
 
@@ -46,36 +57,34 @@ const App: React.FC = () => {
   return (
     <Provider store={store}>
       <Router>
-        <div className="App">
-          <Header />
+        <AppShell>
           <Routes>
-            <Route 
-              path="/" 
+            <Route
+              path="/"
               element={
                 <ProtectedRoute>
                   <HomePage />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/login" 
+            <Route
+              path="/login"
               element={
                 <PublicRoute>
                   <LoginPage />
                 </PublicRoute>
-              } 
+              }
             />
-            <Route 
-              path="/register" 
+            <Route
+              path="/register"
               element={
                 <PublicRoute>
                   <RegisterPage />
                 </PublicRoute>
-              } 
+              }
             />
           </Routes>
-          <ToastContainer position="bottom-right" />
-        </div>
+        </AppShell>
       </Router>
     </Provider>
   );

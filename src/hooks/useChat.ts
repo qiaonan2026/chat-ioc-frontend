@@ -1,19 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '@/store/store';
-import { 
-  sendMessageAPI, 
-  getHistoryAPI, 
+import {
+  sendMessageAPI,
+  getHistoryAPI,
   createSessionAPI,
-  Message 
+  listSessionsAPI,
+  Message,
 } from '@/services/chatService';
-import { 
-  addMessage, 
-  setLoading, 
-  setError, 
+import {
+  addMessage,
+  setLoading,
+  setError,
   setMessages,
   clearMessages,
-  setSessionId
+  setSessionId,
 } from '@/store/features/chatSlice';
 
 /**
@@ -25,49 +26,69 @@ export const useChat = () => {
   const [isInitialized, setIsInitialized] = useState(false);
 
   // 发送消息
-  const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim()) return;
+  const sendMessage = useCallback(
+    async (content: string) => {
+      if (!content.trim()) return;
 
-    try {
-      // 创建用户消息对象
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        content,
-        sender: 'user',
-        timestamp: new Date(),
-        status: 'sending' as const
-      };
+      try {
+        // 确保已有有效 sessionId（后端要求不能为空）
+        let activeSessionId = sessionId || undefined;
+        if (!activeSessionId) {
+          const sessionData = await createSessionAPI();
+          if (sessionData?.sessionId) {
+            activeSessionId = sessionData.sessionId;
+            dispatch(setSessionId(sessionData.sessionId));
+          }
+        }
+        if (!activeSessionId) {
+          throw new Error('未能创建会话，请稍后重试');
+        }
+        const ensuredSessionId: string = activeSessionId;
 
-      // 立即添加用户消息到UI
-      dispatch(addMessage(userMessage));
+        // 创建用户消息对象
+        const userMessage: Message = {
+          id: Date.now().toString(),
+          content,
+          sender: 'user',
+          timestamp: new Date(),
+          status: 'sending' as const,
+        };
 
-      // 发送消息到后端
-      await dispatch(sendMessageAPI({ content, sessionId: sessionId || undefined }));
+        // 立即添加用户消息到UI
+        dispatch(addMessage(userMessage));
 
-      return { success: true };
-    } catch (err: any) {
-      const errorMsg = err.message || '发送消息失败';
-      dispatch(setError(errorMsg));
-      return { success: false, error: errorMsg };
-    }
-  }, [dispatch, sessionId]);
+        // 发送消息到后端
+        await dispatch(sendMessageAPI({ content, sessionId: ensuredSessionId }));
+
+        return { success: true };
+      } catch (err: any) {
+        const errorMsg = err.message || '发送消息失败';
+        dispatch(setError(errorMsg));
+        return { success: false, error: errorMsg };
+      }
+    },
+    [dispatch, sessionId]
+  );
 
   // 获取聊天历史
-  const loadHistory = useCallback(async (session: string) => {
-    try {
-      dispatch(setLoading(true));
-      const history = await dispatch(getHistoryAPI(session)).unwrap();
-      dispatch(setMessages(history));
-      dispatch(setSessionId(session));
-      return { success: true, history };
-    } catch (err: any) {
-      const errorMsg = err.message || '加载历史记录失败';
-      dispatch(setError(errorMsg));
-      return { success: false, error: errorMsg };
-    } finally {
-      dispatch(setLoading(false));
-    }
-  }, [dispatch]);
+  const loadHistory = useCallback(
+    async (session: string) => {
+      try {
+        dispatch(setLoading(true));
+        const history = await dispatch(getHistoryAPI(session)).unwrap();
+        dispatch(setMessages(history));
+        dispatch(setSessionId(session));
+        return { success: true, history };
+      } catch (err: any) {
+        const errorMsg = err.message || '加载历史记录失败';
+        dispatch(setError(errorMsg));
+        return { success: false, error: errorMsg };
+      } finally {
+        dispatch(setLoading(false));
+      }
+    },
+    [dispatch]
+  );
 
   // 创建新会话
   const createNewSession = useCallback(async () => {
@@ -75,7 +96,9 @@ export const useChat = () => {
       dispatch(setLoading(true));
       const sessionData = await createSessionAPI();
       dispatch(clearMessages());
-      dispatch(setSessionId(sessionData.id));
+      if (sessionData?.sessionId) {
+        dispatch(setSessionId(sessionData.sessionId));
+      }
       return { success: true, session: sessionData };
     } catch (err: any) {
       const errorMsg = err.message || '创建会话失败';
@@ -94,10 +117,32 @@ export const useChat = () => {
   // 初始化聊天
   useEffect(() => {
     if (!isInitialized) {
-      // 可以在这里初始化默认会话或加载最近的会话
+      (async () => {
+        if (sessionId) return;
+        try {
+          const { sessions } = await listSessionsAPI(1, 0);
+          const latestId = sessions?.[0]?.sessionId;
+          if (latestId) {
+            await loadHistory(latestId);
+            return;
+          }
+          // 若无最近会话，则主动创建一次新会话并设置为当前
+          await createNewSession();
+        } catch (e: any) {
+          // 兜底：拉取失败时也创建新会话，保证可用
+          await createNewSession();
+        }
+      })();
       setIsInitialized(true);
     }
-  }, [isInitialized]);
+  }, [createNewSession, isInitialized, loadHistory, sessionId]);
+
+  // 记住最近使用的会话
+  useEffect(() => {
+    if (sessionId) {
+      localStorage.setItem('last_session_id', sessionId);
+    }
+  }, [sessionId]);
 
   return {
     messages,
@@ -108,6 +153,6 @@ export const useChat = () => {
     loadHistory,
     createNewSession,
     clearCurrentSession,
-    isInitialized
+    isInitialized,
   };
 };

@@ -1,5 +1,5 @@
-import axios from 'axios';
 import { unwrapBackendResponse } from '@/utils/apiUtils';
+import { apiClient } from '@/services/httpClient';
 
 export interface HomeInfo {
   title: string;
@@ -10,16 +10,6 @@ export interface HomeInfo {
   activeUsers: number;
   status: string;
 }
-
-const API_BASE_URL = (import.meta.env as any)?.VITE_API_URL || '/api';
-
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
 
 const HOME_INFO_TTL_MS = 30_000;
 let homeInfoCache: { value: HomeInfo; ts: number } | null = null;

@@ -1,6 +1,6 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
 import { unwrapBackendResponse } from '@/utils/apiUtils';
+import { apiClient } from '@/services/httpClient';
 
 // 定义消息类型
 export interface Message {
@@ -11,45 +11,6 @@ export interface Message {
   status?: 'sending' | 'sent' | 'failed';
 }
 
-// API基础配置
-const API_BASE_URL = (import.meta.env as any)?.VITE_API_URL || '/api';
-
-// 创建axios实例
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 30000, // 30秒超时
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// 请求拦截器 - 添加认证token
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// 响应拦截器 - 处理错误
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token过期，清除本地存储并重定向到登录页
-      localStorage.removeItem('access_token');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
-
 // 发送消息异步操作
 export const sendMessageAPI = createAsyncThunk(
   'chat/sendMessage',
@@ -59,14 +20,17 @@ export const sendMessageAPI = createAsyncThunk(
         content,
         sessionId: sessionId || null,
       });
-      
+
       const raw = response.data;
       const data = unwrapBackendResponse<any>(raw);
       return {
-        id: data.id || Date.now().toString(),
-        content: data.content || content,
-        sender: 'ai' as const,
-        timestamp: new Date(),
+        aiMessage: {
+          id: data.id || Date.now().toString(),
+          content: data.reply ?? data.content ?? '',
+          sender: 'ai' as const,
+          timestamp: new Date(),
+        },
+        sessionId: data.sessionId ?? sessionId,
       };
     } catch (error: any) {
       if (error.response && error.response.data) {
@@ -83,14 +47,17 @@ export const getHistoryAPI = createAsyncThunk(
   'chat/getHistory',
   async (sessionId: string, { rejectWithValue }) => {
     try {
-      const response = await apiClient.get(`/chat/history/${sessionId}`);
+      // 按接口文档：GET /api/chat/session?sessionId=<sessionId>
+      const response = await apiClient.get(`/chat/session`, {
+        params: { sessionId },
+      });
       const raw = response.data;
       const data = unwrapBackendResponse<any>(raw);
       return (data.messages || []).map((msg: any) => ({
-        id: msg.id,
-        content: msg.content,
-        sender: msg.sender,
-        timestamp: new Date(msg.timestamp),
+        id: String(msg.id ?? ''),
+        content: msg.content ?? '',
+        sender: (msg.role === 'assistant' ? 'ai' : msg.role) ?? msg.sender,
+        timestamp: new Date(msg.createdAt ?? msg.timestamp ?? Date.now()),
       }));
     } catch (error: any) {
       if (error.response && error.response.data) {
@@ -101,6 +68,30 @@ export const getHistoryAPI = createAsyncThunk(
     }
   }
 );
+
+export interface ChatSessionSummary {
+  sessionId: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const listSessionsAPI = async (limit = 20, offset = 0) => {
+  const response = await apiClient.get('/chat/sessions', {
+    params: { limit, offset },
+  });
+  const data = unwrapBackendResponse<any>(response.data);
+  const sessions = (data.sessions || []).map((s: any) => ({
+    sessionId: s.sessionId,
+    createdAt: s.createdAt ? new Date(s.createdAt) : undefined,
+    updatedAt: s.updatedAt ? new Date(s.updatedAt) : undefined,
+  })) as ChatSessionSummary[];
+
+  return {
+    limit: data.limit ?? limit,
+    offset: data.offset ?? offset,
+    sessions,
+  };
+};
 
 // 获取可用AI模型列表
 export const getModelsAPI = async () => {
@@ -117,9 +108,20 @@ export const getModelsAPI = async () => {
 export const createSessionAPI = async () => {
   try {
     const response = await apiClient.post('/chat/session');
-    return unwrapBackendResponse<any>(response.data);
+    const data = unwrapBackendResponse<any>(response.data);
+    return {
+      sessionId: data.sessionId ?? data.id,
+      createdAt: data.createdAt ? new Date(data.createdAt) : undefined,
+    };
   } catch (error) {
     console.error('创建会话失败:', error);
     throw error;
   }
+};
+
+export const deleteSessionAPI = async (sessionId: string) => {
+  const response = await apiClient.delete('/chat/session', {
+    params: { sessionId },
+  });
+  return unwrapBackendResponse<any>(response.data);
 };

@@ -7,10 +7,12 @@ export const store = configureStore({
     chat: chatReducer,
     user: userReducer,
   },
-  middleware: (getDefaultMiddleware) =>
+  middleware: getDefaultMiddleware =>
     getDefaultMiddleware({
       serializableCheck: {
         ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+        // 兼容：消息里 timestamp 是 Date 对象（非序列化），避免开发期告警刷屏
+        ignoredPaths: ['chat.messages'],
       },
     }),
 });

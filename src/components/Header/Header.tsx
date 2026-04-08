@@ -1,12 +1,23 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { RootState } from '@/store/store';
 import { useAuth } from '@/hooks/useAuth';
 
 const Header: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.user);
   const { logout: handleLogout, loading } = useAuth();
+
+  const techBlueGradientText =
+    'bg-gradient-to-r from-cyan-400 to-blue-600 text-transparent bg-clip-text drop-shadow-sm';
+
+  const navItemClassName = ({ isActive }: { isActive: boolean }) =>
+    [
+      'text-gray-800 hover:text-blue-600 transition-colors',
+      isActive ? 'text-[#1677FF] font-semibold' : 'font-normal',
+    ]
+      .filter(Boolean)
+      .join(' ');
 
   return (
     <header className="bg-white shadow-md py-4 px-6 flex justify-between items-center">
@@ -23,29 +34,29 @@ const Header: React.FC = () => {
                 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="%233B82F6"/></svg>';
             }}
           />
-          <span className="text-xl font-bold text-gray-800">纳米AI</span>
+          <span className={`text-xl font-bold ${techBlueGradientText}`}>纳米AI</span>
         </Link>
 
         {/* 导航菜单 */}
         <nav className="hidden md:flex space-x-6">
-          <Link to="/" className="text-gray-600 hover:text-blue-600 transition-colors">
+          <NavLink to="/" end className={navItemClassName}>
             首页
-          </Link>
-          <Link to="/models" className="text-gray-600 hover:text-blue-600 transition-colors">
+          </NavLink>
+          <NavLink to="/models" className={navItemClassName}>
             大模型
-          </Link>
-          <Link to="/agents" className="text-gray-600 hover:text-blue-600 transition-colors">
+          </NavLink>
+          <NavLink to="/agents" className={navItemClassName}>
             智能体
-          </Link>
-          <Link to="/knowledge" className="text-gray-600 hover:text-blue-600 transition-colors">
+          </NavLink>
+          <NavLink to="/knowledge" className={navItemClassName}>
             知识库
-          </Link>
-          <Link to="/writing" className="text-gray-600 hover:text-blue-600 transition-colors">
+          </NavLink>
+          <NavLink to="/writing" className={navItemClassName}>
             AI写作
-          </Link>
-          <Link to="/editing" className="text-gray-600 hover:text-blue-600 transition-colors">
+          </NavLink>
+          <NavLink to="/editing" className={navItemClassName}>
             AI修图
-          </Link>
+          </NavLink>
         </nav>
       </div>
 
